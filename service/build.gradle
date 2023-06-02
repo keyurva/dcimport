@@ -34,6 +34,9 @@ dependencies {
 application {
     mainClass.set("org.datacommons.service.Application")
 }
+run {
+    systemProperty "dcimport.jar", System.getProperty('dcimport.jar')
+}
 java {
     sourceCompatibility = JavaVersion.toVersion("17")
     targetCompatibility = JavaVersion.toVersion("17")
