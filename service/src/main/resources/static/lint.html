@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>dc-import lint</title>
+    <script src="jquery/3.6.4/jquery.min.js"></script>
+</head>
+<body>
+
+<h1>dc-import lint</h1>
+
+<div id="app">
+    <h2>Upload MCF to lint</h2>
+    <div id="input">
+        <form method="POST" enctype="multipart/form-data" id="frm">
+            <input type="file" name="file"/>
+            <input type="submit" value="Upload" id="btn"/>
+        </form>
+    </div>
+    <div>&nbsp;</div>
+    <div id="result"></div>
+</div>
+
+<script lang="js">
+
+$(document).ready(function () {
+
+    $("#btn").click(function (event) {
+        event.preventDefault();
+
+        var form = $('#frm')[0];
+		var data = new FormData(form);
+
+		$("#btn").prop("disabled", true);
+		$("#result").html(`<div>Uploading file...</div>`);
+
+        $.ajax({
+            type: "POST",
+            enctype: 'multipart/form-data',
+            url: "/lint.json",
+            data: data,
+            processData: false,
+            contentType: false,
+            cache: false,
+            timeout: 600000,
+            success: function (response) {
+                console.log("RESPONSE : ", response);
+                $("#btn").prop("disabled", false);
+
+                if (response.files) {
+                    var html = "";
+                    response.files.forEach(file => html += `<div><a href="${file}" target="_blank">${file.substr(file.lastIndexOf("/") + 1)}</a></div>`);
+                    $("#result").html(`<div>${html}</div>`);
+                } else if (response.error) {
+                    $("#result").html(`<div>lint error</div>`);
+                }
+            },
+            error: function (e) {
+                $("#result").text(e.responseText);
+                console.log("ERROR : ", e);
+                $("#btn").prop("disabled", false);
+
+            }
+        });
+
+    });
+
+});
+
+
+
+
+</script>
+
+</body>
+</html>

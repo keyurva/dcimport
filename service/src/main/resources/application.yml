@@ -1,6 +1,12 @@
 micronaut:
   application:
     name: default
+  router:
+    static-resources:
+      default:
+        paths:
+          - "classpath:static"
+          - "classpath:META-INF/resources/webjars"
 netty:
   default:
     allocator:
