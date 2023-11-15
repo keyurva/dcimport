@@ -24,6 +24,9 @@ from stats.reporter import FileImportReporter
 from stats.reporter import ImportReporter
 from util.filehandler import create_file_handler
 from util.filehandler import FileHandler
+import tempfile
+from stats.db import Db
+import os
 
 
 class Runner:
@@ -42,6 +45,9 @@ class Runner:
     self.nl_dir_fh = self.output_dir_fh.make_file(f"{constants.NL_DIR_NAME}/")
     self.process_dir_fh = self.output_dir_fh.make_file(
         f"{constants.PROCESS_DIR_NAME}/")
+    # Create DB with a local file path. We'll write to output dir (local or GCS) later.
+    self.db = Db(
+        os.path.join(tempfile.TemporaryDirectory(), constants.DB_FILE_NAME))
     self.reporter = ImportReporter(report_fh=self.process_dir_fh.make_file(
         constants.REPORT_JSON_FILE_NAME))
     self.entity_type = entity_type
@@ -67,13 +73,21 @@ class Runner:
       self._run_imports()
 
       # Generate triples.
-      self.nodes.triples(
+      triples = self.nodes.triples(
           self.output_dir_fh.make_file(constants.TRIPLES_FILE_NAME))
+      # Write triples to DB.
+      self.db.insert_triples(triples)
 
       # Generate SV sentences.
       nl.generate_sv_sentences(
           list(self.nodes.variables.values()),
           self.nl_dir_fh.make_file(constants.SENTENCES_FILE_NAME))
+
+      # Write DB to output dir
+      self.db.close()
+      with open(self.db.db_file_path, "rb") as f:
+        self.output_dir_fh.make_file(constants.DB_FILE_NAME).write_bytes(
+            f.read())
 
       # Report done.
       self.reporter.report_done()
@@ -113,6 +127,7 @@ class Runner:
     debug_resolve_fh = self.process_dir_fh.make_file(
         f"{constants.DEBUG_RESOLVE_FILE_NAME_PREFIX}_{basename}")
     importer = SimpleStatsImporter(input_fh=input_file_fh,
+                                   db=self.db,
                                    observations_fh=observations_fh,
                                    debug_resolve_fh=debug_resolve_fh,
                                    reporter=reporter,

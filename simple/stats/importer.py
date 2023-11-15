@@ -18,8 +18,10 @@ import random
 import pandas as pd
 from stats import constants
 from stats.nodes import Nodes
+from stats.data import Observation
 from stats.reporter import FileImportReporter
 from util.filehandler import FileHandler
+from stats.db import Db
 
 from util import dc_client as dc
 
@@ -36,6 +38,7 @@ class SimpleStatsImporter:
   def __init__(
       self,
       input_fh: FileHandler,
+      db: Db,
       observations_fh: FileHandler,
       debug_resolve_fh: FileHandler,
       reporter: FileImportReporter,
@@ -44,6 +47,7 @@ class SimpleStatsImporter:
       ignore_columns: list[str] = list(),
   ) -> None:
     self.input_fh = input_fh
+    self.db = db
     self.observations_fh = observations_fh
     self.debug_resolve_fh = debug_resolve_fh
     self.reporter = reporter
@@ -62,6 +66,7 @@ class SimpleStatsImporter:
       self._resolve_entities()
       self._rename_columns()
       self._add_entity_nodes()
+      self._write_observations()
       self.reporter.report_success()
     except Exception as e:
       self.reporter.report_failure(str(e))
@@ -103,6 +108,29 @@ class SimpleStatsImporter:
     renamed.update({col: id for col, id in zip(sv_column_names, sv_ids)})
 
     self.df = self.df.rename(columns=renamed)
+
+  def _write_observations(self) -> None:
+    # Melt dataframe so shape it similar to the observations table.
+    # Convert all values to str first, otherwise it inserts ints as floats.
+    observations_df = self.df.astype(str)
+    observations_df = observations_df.melt(
+        id_vars=[constants.COLUMN_DCID, constants.COLUMN_DATE],
+        var_name="variable",
+        value_name="value",
+    ).dropna()
+
+    # Reorder columns so they are in the same order as observations
+    observations_df.reindex(columns=[
+        constants.COLUMN_DCID, "variable", constants.COLUMN_DATE, "value"
+    ])
+
+    # Add provenance column. Value = filename for now.
+    observations_df["provenance"] = self.input_fh.basename()
+
+    observations: list[Observation] = []
+    for row in observations_df.itertuples(index=False):
+      observations.append(Observation(*row))
+    self.db.insert_observations(observations)
 
   def _add_entity_nodes(self) -> None:
     if not self.entity_type:

@@ -17,19 +17,18 @@ import sqlite3
 from stats.data import Observation
 from stats.data import Triple
 
+_DELETE_TRIPLES_TABLE = "drop table if exists triples;"
+_DELETE_OBSERVATIONS_TABLE = "drop table if exists observations;"
 _CREATE_TRIPLES_TABLE = """
-create table if not exists triples (
+create table triples (
     subject_id TEXT,
     predicate TEXT,
     object_id TEXT,
     object_value TEXT
 );
 """
-
-_INSERT_TRIPLES_STATEMENT = "insert into triples values(?, ?, ?, ?)"
-
 _CREATE_OBSERVATIONS_TABLE = """
-create table if not exists observations (
+create table observations (
     entity TEXT,
     variable TEXT,
     date TEXT,
@@ -38,6 +37,17 @@ create table if not exists observations (
 );
 """
 
+_INIT_SCRIPT = f"""
+BEGIN;
+{_DELETE_TRIPLES_TABLE}
+{_DELETE_OBSERVATIONS_TABLE}
+{_CREATE_TRIPLES_TABLE}
+{_CREATE_OBSERVATIONS_TABLE}
+COMMIT;
+"""
+
+_INSERT_TRIPLES_STATEMENT = "insert into triples values(?, ?, ?, ?)"
+
 _INSERT_OBSERVATIONS_STATEMENT = "insert into observations values(?, ?, ?, ?, ?)"
 
 
@@ -45,9 +55,9 @@ class Db:
   """Class to insert triples and observations into a sqlite DB."""
 
   def __init__(self, db_file_path: str) -> None:
+    self.db_file_path = db_file_path
     self.db = sqlite3.connect(db_file_path)
-    self.db.execute(_CREATE_TRIPLES_TABLE)
-    self.db.execute(_CREATE_OBSERVATIONS_TABLE)
+    self.db.executescript(_INIT_SCRIPT)
     pass
 
   def insert_triples(self, triples: list[Triple]):
